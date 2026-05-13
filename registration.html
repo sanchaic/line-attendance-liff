@@ -151,17 +151,17 @@
     showStatus('loading', '⏳ กำลังบันทึกข้อมูล...');
 
     try {
-      const response = await fetch(GAS_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'register',
-          userId: lineUserId,
-          employeeId: employeeId,
-          fullName: fullName
-        })
+      const params = new URLSearchParams({
+        action: 'register',
+        userId: lineUserId,
+        employeeId: employeeId,
+        fullName: fullName
       });
-
+      
+      const response = await fetch(GAS_URL + '?' + params.toString(), {
+        method: 'GET',
+      });
+      
       const result = await response.json();
 
       if (result.status === 'success') {
