@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ลงทะเบียนพนักงาน</title>
+  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    }
+    .logo { text-align: center; margin-bottom: 24px; }
+    .logo h1 { font-size: 20px; color: #1a3a5c; margin-top: 8px; }
+    .logo p  { font-size: 13px; color: #888; margin-top: 4px; }
+    .form-group { margin-bottom: 16px; }
+    label {
+      display: block;
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 10px;
+      font-size: 15px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus   { border-color: #06c755; }
+    input:disabled { background: #f5f5f5; color: #888; }
+    .btn {
+      width: 100%;
+      padding: 14px;
+      background: #06c755;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.2s;
+    }
+    .btn:hover    { background: #05a847; }
+    .btn:disabled { background: #ccc; cursor: not-allowed; }
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      text-align: center;
+      display: none;
+    }
+    .status.success { background: #e6f9ee; color: #05a847; display: block; }
+    .status.error   { background: #ffeaea; color: #e03e3e; display: block; }
+    .status.loading { background: #e8f4ff; color: #1a6fb5; display: block; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <h1>📋 ลงทะเบียนพนักงาน</h1>
+    <p>IT Time Attendance System</p>
+  </div>
+
+  <div class="form-group">
+    <label>LINE User ID</label>
+    <input type="text" id="userId" placeholder="กำลังโหลด..." disabled />
+  </div>
+
+  <div class="form-group">
+    <label>รหัสพนักงาน (Employee ID) *</label>
+    <input type="text" id="employeeId" placeholder="เช่น EMP001" maxlength="20" />
+  </div>
+
+  <div class="form-group">
+    <label>ชื่อ-นามสกุล (Full Name) *</label>
+    <input type="text" id="fullName" placeholder="เช่น สมชาย ใจดี" maxlength="100" />
+  </div>
+
+  <button class="btn" id="submitBtn" onclick="submitRegistration()">
+    ลงทะเบียน
+  </button>
+
+  <div class="status" id="statusMsg"></div>
+</div>
+
+<script>
+  
+  const LIFF_ID  = '2010076951-mFvR9Idi';         // เช่น '1234567890-AbCdEfGh'
+  const GAS_URL  = 'https://script.google.com/macros/s/AKfycbyZKnGDzyxEBaVR4gGErO2aP93R4ruxn0chc5OnvjaHZZ2qAfzkyzL5aldOeZ7AoNXq4w/exec'; // เช่น 'https://script.google.com/macros/s/xxx/exec'
+  // ========================================
+
+  let lineUserId = '';
+
+  function initLiff() {
+    showStatus('loading', '⏳ กำลัง init LIFF...');
+
+    liff.init({ liffId: LIFF_ID })
+      .then(function() {
+        showStatus('loading', '⏳ กำลังเช็ค login...');
+        if (!liff.isLoggedIn()) {
+          liff.login();
+          return;
+        }
+        return liff.getProfile();
+      })
+      .then(function(profile) {
+        if (!profile) return;
+        lineUserId = profile.userId;
+        document.getElementById('userId').value = lineUserId;
+        document.getElementById('statusMsg').style.display = 'none';
+      })
+      .catch(function(err) {
+        showStatus('error', '❌ Error: ' + err.message);
+      });
+  }
+
+  async function submitRegistration() {
+    const employeeId = document.getElementById('employeeId').value.trim();
+    const fullName   = document.getElementById('fullName').value.trim();
+
+    if (!employeeId || !fullName) {
+      showStatus('error', '⚠️ กรุณากรอกข้อมูลให้ครบถ้วน');
+      return;
+    }
+    if (!lineUserId) {
+      showStatus('error', '⚠️ ไม่พบข้อมูล LINE User กรุณาลองใหม่');
+      return;
+    }
+
+    document.getElementById('submitBtn').disabled = true;
+    showStatus('loading', '⏳ กำลังบันทึกข้อมูล...');
+
+    try {
+      const response = await fetch(GAS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'register',
+          userId: lineUserId,
+          employeeId: employeeId,
+          fullName: fullName
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        showStatus('success', '✅ ลงทะเบียนสำเร็จ! ' + fullName);
+        setTimeout(() => liff.closeWindow(), 2000);
+      } else if (result.status === 'duplicate') {
+        showStatus('error', '⚠️ userId นี้ลงทะเบียนแล้ว');
+        document.getElementById('submitBtn').disabled = false;
+      } else {
+        showStatus('error', '❌ เกิดข้อผิดพลาด กรุณาลองใหม่');
+        document.getElementById('submitBtn').disabled = false;
+      }
+    } catch (err) {
+      showStatus('error', '❌ เชื่อมต่อไม่ได้: ' + err.message);
+      document.getElementById('submitBtn').disabled = false;
+    }
+  }
+
+  function showStatus(type, message) {
+    const el = document.getElementById('statusMsg');
+    el.className = 'status ' + type;
+    el.textContent = message;
+  }
+
+  initLiff();
+</script>
+</body>
+</html>
