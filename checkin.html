@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เช็คอิน</title>
+  <script src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 32px 24px;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+    h1 { font-size: 20px; color: #1a3a5c; margin-bottom: 8px; }
+    p  { font-size: 13px; color: #888; margin-bottom: 24px; }
+    .status {
+      padding: 16px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .status.loading { background: #e8f4ff; color: #1a6fb5; }
+    .status.success { background: #e6f9ee; color: #05a847; }
+    .status.error   { background: #ffeaea; color: #e03e3e; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <h1>📍 เช็คอิน</h1>
+  <p>IT Time Attendance System</p>
+  <div class="status loading" id="statusMsg">⏳ กำลังระบุตำแหน่ง...</div>
+</div>
+
+<script>
+  const LIFF_ID = '2010076951-NtsRXWXl';   // ⚠️ แทนค่าจริง
+  const GAS_URL = 'https://script.google.com/macros/s/AKfycbyZKnGDzyxEBaVR4gGErO2aP93R4ruxn0chc5OnvjaHZZ2qAfzkyzL5aldOeZ7AoNXq4w/exec';    // ⚠️ แทนค่าจริง
+
+  let lineUserId = '';
+
+  function showStatus(type, message) {
+    const el = document.getElementById('statusMsg');
+    el.className = 'status ' + type;
+    el.innerHTML = message;
+  }
+
+  function getLocation() {
+    if (!navigator.geolocation) {
+      showStatus('error', '❌ อุปกรณ์นี้ไม่รองรับ GPS ครับ');
+      return;
+    }
+
+    showStatus('loading', '⏳ กำลังระบุตำแหน่ง...');
+
+    navigator.geolocation.getCurrentPosition(
+      function(position) {
+        const lat      = position.coords.latitude;
+        const lng      = position.coords.longitude;
+        const accuracy = position.coords.accuracy;
+
+        // Accuracy Check — ถ้าเกิน 500m ปฏิเสธ
+        if (accuracy > 500) {
+          showStatus('error',
+            '❌ ตำแหน่ง GPS ไม่แม่นยำพอครับ\n\nความแม่นยำปัจจุบัน: ' +
+            Math.round(accuracy) + ' เมตร\n\nกรุณาออกไปที่โล่งแล้วลองใหม่ครับ');
+          return;
+        }
+
+        showStatus('loading', '⏳ กำลังบันทึกข้อมูล...');
+        sendCheckIn(lat, lng, accuracy);
+      },
+      function(error) {
+        let msg = '❌ ไม่สามารถระบุตำแหน่งได้ครับ\n\n';
+        if (error.code === 1) msg += 'กรุณาอนุญาต GPS แล้วลองใหม่ครับ';
+        if (error.code === 2) msg += 'GPS ไม่พร้อมใช้งาน กรุณาลองใหม่ครับ';
+        if (error.code === 3) msg += 'GPS ใช้เวลานานเกินไป กรุณาลองใหม่ครับ';
+        showStatus('error', msg);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }
+
+  function sendCheckIn(lat, lng, accuracy) {
+    const params = new URLSearchParams({
+      action: 'checkin',
+      userId: lineUserId,
+      lat: lat,
+      lng: lng,
+      accuracy: accuracy
+    });
+
+    fetch(GAS_URL + '?' + params.toString())
+      .then(function(res) { return res.json(); })
+      .then(function(result) {
+        if (result.status === 'success') {
+          showStatus('success', result.message);
+          setTimeout(function() { liff.closeWindow(); }, 3000);
+        } else if (result.status === 'duplicate') {
+          showStatus('error', '⚠️ บันทึกเข้างานวันนี้ไปแล้วครับ');
+        } else {
+          showStatus('error', '❌ ' + (result.message || 'เกิดข้อผิดพลาด กรุณาลองใหม่ครับ'));
+        }
+      })
+      .catch(function(err) {
+        showStatus('error', '❌ เชื่อมต่อไม่ได้: ' + err.message);
+      });
+  }
+
+  liff.init({ liffId: LIFF_ID })
+    .then(function() {
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return;
+      }
+      return liff.getProfile();
+    })
+    .then(function(profile) {
+      if (!profile) return;
+      lineUserId = profile.userId;
+      getLocation();
+    })
+    .catch(function(err) {
+      showStatus('error', '❌ LIFF Error: ' + err.message);
+    });
+</script>
+</body>
+</html>
